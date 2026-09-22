@@ -1,4 +1,5 @@
-from pydantic import BaseModel,EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from uuid import UUID
 
 class UserCreate(BaseModel):
     username: str = Field(
@@ -36,18 +37,18 @@ class UserCreate(BaseModel):
                 {
                     "username": "cranky",
                     "email": "example@example.com",
-                    "password": "ThisIsATest123"
+                    "password": "ThisIsATest123!"
                 }
             ]
         }
     }
 
 class LoginForm(BaseModel):
-    email: str
+    email: EmailStr
     password: str
     
 class UserResponse(BaseModel):
-    id: int
+    id: UUID
     username: str
     email: EmailStr
 
@@ -58,3 +59,5 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+LoginForm.model_rebuild()

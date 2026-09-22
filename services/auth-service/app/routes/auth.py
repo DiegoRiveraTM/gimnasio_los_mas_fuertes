@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
-from db.db import get_session
-from fastapi.security import OAuth2PasswordRequestForm
-from schemas import UserCreate, UserResponse, Token, LoginForm
-from services.auth import register_user as register_user_service, login_user as login_user_service
-from core.limiter import limiter
-from deps import get_current_user
-from models.user import User
+
+from app.core.limiter import limiter
+from app.db.db import get_session
+from app.models.user import User
+from app.schemas.user import LoginForm, Token, UserCreate, UserResponse
+from app.services.auth import (
+    login_user as login_user_service,
+    register_user as register_user_service,
+)
 
 router = APIRouter()
 
@@ -26,12 +28,3 @@ def login_user(
     db: Session = Depends(get_session)
 ):
     return login_user_service(form_data, db)
-
-@router.get("/me", response_model=UserResponse)
-@limiter.limit("5/minute")
-def get_me(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_session)
-):
-    return current_user

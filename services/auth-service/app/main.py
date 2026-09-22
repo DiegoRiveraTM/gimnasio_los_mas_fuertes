@@ -24,7 +24,7 @@ async def add_security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    #response.headers["Content-Security-Policy"] = "default-src 'self'"
     return response
 
 app.state.limiter = limiter
@@ -38,6 +38,6 @@ app.include_router(auth_router, prefix="/auth", tags=["auth"])
 def server_running():
     return {"message": "server running on port 8000"}
 
-app.get('/health')
+@app.get('/health')
 def health_check():
     return {"message": "health check working correctly"}
