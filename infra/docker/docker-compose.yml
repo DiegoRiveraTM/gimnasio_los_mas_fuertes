@@ -29,6 +29,21 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  qr-access-service:
+    build:
+      context: ../../services/access-qr-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    env_file:
+      - ../../services/access-qr-service/.env.docker
+    depends_on:
+      redis:
+        condition: service_started
+      membership-service:
+        condition: service_started
+    restart: unless-stopped
+
   membership-db:
     image: postgres:15
     env_file:
