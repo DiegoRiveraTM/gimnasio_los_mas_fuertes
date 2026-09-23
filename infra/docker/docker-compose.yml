@@ -14,10 +14,40 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  membership-service:
+    build:
+      context: ../../services/membership-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - ../../services/membership-service/.env.docker
+    depends_on:
+      membership-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  membership-db:
+    image: postgres:15
+    env_file:
+      - ../../services/membership-service/.env.docker
+    ports:
+      - "5434:5432"
+    volumes:
+      - membership_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   auth-db:
     image: postgres:15
     env_file:
-    - ../../services/auth-service/.env.docker
+      - ../../services/auth-service/.env.docker
     ports:
       - "5433:5432"
     volumes:
@@ -56,5 +86,6 @@ services:
 
 volumes:
   auth_db_data:
+  membership_db_data:
   redis_data:
   grafana_data:
