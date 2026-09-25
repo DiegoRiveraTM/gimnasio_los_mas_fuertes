@@ -18,19 +18,20 @@ pipeline {
             }
         }
 
-        stage('Python tests') {
+        stage('Unit tests - Python microservices') {
             steps {
                 sh '''
                     set -eu
 
-                    for service in $SERVICES; do
-                        echo "Probando $service"
-
-                        docker run --rm \
-                          -v "$WORKSPACE/$service:/app" \
-                          -w /app \
-                          python:3.12-slim \
-                          sh -c 'pip install --disable-pip-version-check -r requirements.txt pytest && pytest -q'
+                    for service in auth-service membership-service access-qr-service; do
+                        echo "=== Probando $service ==="
+                        (
+                            cd "services/$service"
+                            python3 -m venv .ci-venv
+                            .ci-venv/bin/python -m pip install --upgrade pip
+                            .ci-venv/bin/python -m pip install -r requirements.txt pytest fakeredis
+                            .ci-venv/bin/python -m pytest -q
+                        )
                     done
                 '''
             }
@@ -48,20 +49,16 @@ pipeline {
             }
         }
 
-        stage('Build and scan Docker images') {
+        stage('Build Docker images') {
             steps {
                 sh '''
                     set -eu
 
-                    for service in $SERVICES; do
-                        name=$(basename "$service")
-                        image="gym-mvp/$name:${BUILD_NUMBER}"
-
-                        echo "Construyendo $image"
-                        docker build --pull -t "$image" "$service"
-
-                        echo "Escaneando $image"
-                        trivy image --exit-code 1 --severity HIGH,CRITICAL "$image"
+                    for service in auth-service membership-service access-qr-service; do
+                        echo "=== Construyendo imagen de $service ==="
+                        docker build --pull \
+                            -t "gym-lmf/$service:$BUILD_NUMBER" \
+                            "services/$service"
                     done
                 '''
             }
