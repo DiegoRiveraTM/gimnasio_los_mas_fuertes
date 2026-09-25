@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: membership-service
+  namespace: gym-lmf
+  labels:
+    app: membership-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: membership-service
+  template:
+    metadata:
+      labels:
+        app: membership-service
+    spec:
+      containers:
+        - name: membership-service
+          image: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/membership-service:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]

@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: access-qr-service
+  namespace: gym-lmf
+  labels:
+    app: access-qr-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: access-qr-service
+  template:
+    metadata:
+      labels:
+        app: access-qr-service
+    spec:
+      containers:
+        - name: access-qr-service
+          image: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/access-qr-service:IMAGE_TAG
+          ports:
+            - name: http
+              containerPort: 8002
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]

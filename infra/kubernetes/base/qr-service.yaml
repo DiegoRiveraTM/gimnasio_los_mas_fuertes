@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: access-qr-service
+  namespace: gym-lmf
+spec:
+  type: ClusterIP
+  selector:
+    app: access-qr-service
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002
+      protocol: TCP

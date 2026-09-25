@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - auth-deployment.yaml
+  - auth-service.yaml
+  - membership-deployment.yaml
+  - membership-service.yaml
+  - qr-deployment.yaml
+  - qr-service.yaml
