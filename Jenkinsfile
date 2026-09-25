@@ -6,10 +6,9 @@ pipeline {
         disableConcurrentBuilds()
     }
 
-    environment {
-        SERVICES = 'services/auth-service services/membership-service services/access-qr-service'
+        environment {
+        SERVICES = 'auth-service membership-service access-qr-service'
     }
-
     stages {
         stage('Checkout') {
             steps {
@@ -23,14 +22,18 @@ pipeline {
                 sh '''
                     set -eu
 
-                    for service in auth-service membership-service access-qr-service; do
+                    for service in $SERVICES; do
                         echo "=== Probando $service ==="
+                        venv="$WORKSPACE/.ci-venvs/$service"
+
+                        python3 -m venv "$venv"
+                        "$venv/bin/python" -m pip install --upgrade pip
+                        "$venv/bin/python" -m pip install \
+                            -r "services/$service/requirements.txt" pytest fakeredis
+
                         (
                             cd "services/$service"
-                            python3 -m venv .ci-venv
-                            .ci-venv/bin/python -m pip install --upgrade pip
-                            .ci-venv/bin/python -m pip install -r requirements.txt pytest fakeredis
-                            .ci-venv/bin/python -m pytest -q
+                            "$venv/bin/python" -m pytest -q
                         )
                     done
                 '''
@@ -39,7 +42,7 @@ pipeline {
 
         stage('Trivy filesystem scan') {
             steps {
-                sh 'trivy fs --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 .'
+                sh 'trivy fs --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs "./.ci-venvs" .'
             }
         }
 
