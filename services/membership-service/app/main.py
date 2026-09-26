@@ -13,12 +13,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], #Change in production
+    allow_origins=["http://localhost:5174",],
     allow_credentials = True,
-    allow_methods=["GET", "PUT", "DELETE", "POST"],
-    allow_headers=["Authorization", "Content-Type"]
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],    
 )
-
 @app.middleware("http")
 async def add_security_headers(request, call_next):
     response = await call_next(request)

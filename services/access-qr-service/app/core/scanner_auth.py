@@ -13,9 +13,15 @@ def require_scanner_key(
 ) -> bool:
     expected = settings.QR_SCANNER_API_KEY.get_secret_value()
 
-    if x_scanner_api_key is None or not secrets.compare_digest(
-        x_scanner_api_key,
-        expected,
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Scanner authentication is not configured",
+        )
+
+    if not x_scanner_api_key or not secrets.compare_digest(
+        x_scanner_api_key.encode("utf-8"),
+        expected.encode("utf-8"),
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
