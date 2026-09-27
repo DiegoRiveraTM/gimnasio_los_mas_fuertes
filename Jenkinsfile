@@ -18,6 +18,13 @@ pipeline {
         }
 
         stage('Unit tests - Python microservices') {
+            environment {
+            DATABASE_URL = 'postgresql+psycopg://ci:ci@127.0.0.1:1/ci'
+            REDIS_URL = 'redis://127.0.0.1:1/0'
+            SECRET_KEY = 'ci-only-signing-key-not-for-production-123456789'
+            MEMBERSHIP_SERVICE_URL = 'http://127.0.0.1:1'
+            QR_SCANNER_API_KEY = 'ci-only-scanner-key'
+        }
             steps {
                 sh '''
                     set -eu

@@ -47,7 +47,12 @@ def client(monkeypatch, fake_redis):
     from app.services import qr as qr_service
 
     async def fake_get_membership(access_token: str):
-        return {"status": "active"}
+    return {
+        "status": "active",
+        "next_payment_at": (
+            datetime.now(UTC) + timedelta(days=30)
+        ).isoformat(),
+    }
 
     monkeypatch.setattr(qr_service, "get_membership", fake_get_membership)
 

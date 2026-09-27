@@ -43,12 +43,12 @@ def auth_token(client):
     client.post("/auth/register", json={
         "username": "Test",
         "email": "example@example.com",
-        "password": "ThisIsATest123"
+        "password": "ThisIsATest123!"
     })
 
     response = client.post("/auth/login", json={
         "email": "example@example.com",
-        "password": "ThisIsATest123"
+        "password": "ThisIsATest123!"
     })
 
     return response.json()["access_token"]
