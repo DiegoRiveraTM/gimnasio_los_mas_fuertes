@@ -141,5 +141,50 @@ pipeline {
                 '''
             }
         }
+
+        stage('Load images into local Kind') {
+            options { timeout(time: 15, unit: 'MINUTES') }
+        steps {
+            sh '''#!/bin/bash
+                set -euo pipefail
+
+                cluster=$(docker inspect --format '{{ index .Config.Labels "io.x-k8s.kind.cluster" }}' gym-lmf-control-plane)
+                test "$cluster" = "gym-lmf"
+
+                for service in auth-service membership-service access-qr-service; do
+                    docker image inspect "gym-lmf/$service:$BUILD_NUMBER" > /dev/null
+                done
+
+                docker save \
+                "gym-lmf/auth-service:$BUILD_NUMBER" \
+                "gym-lmf/membership-service:$BUILD_NUMBER" \
+                "gym-lmf/access-qr-service:$BUILD_NUMBER" \
+                | docker exec -i gym-lmf-control-plane ctr --namespace k8s.io images import --all-platforms --digests -
+
+                for service in auth-service membership-service access-qr-service; do
+                    docker exec gym-lmf-control-plane crictl inspecti "gym-lmf/$service:$BUILD_NUMBER" > /dev/null
+                done
+            '''
+            }
+        }
+
+        stage('Publish local GitOps manifests') {
+            options { timeout(time: 5, unit: 'MINUTES') }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'gym-github-gitops-write',
+                    usernameVariable: 'GITOPS_USERNAME',
+                    passwordVariable: 'GITOPS_TOKEN'
+                )]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        "$WORKSPACE/.ci-venvs/auth-service/bin/python" \
+                        infra/jenkins/publish_local_gitops.py
+                    '''
+                }
+            }
+        }
+
     }
 }
