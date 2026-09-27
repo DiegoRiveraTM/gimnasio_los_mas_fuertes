@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.limiter import limiter
 from app.routes.auth import router as auth_router
 
+#Prueba CI/CD end to end.
 app = FastAPI(
     title="Gimnasio",
     version="0.1.0"
