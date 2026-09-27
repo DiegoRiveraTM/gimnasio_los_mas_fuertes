@@ -26,3 +26,5 @@ patches:
     path: "membership-service-patch.yaml"
   -
     path: "access-qr-service-patch.yaml"
+  -
+    path: security-hardening.yaml
