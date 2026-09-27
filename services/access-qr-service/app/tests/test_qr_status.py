@@ -1,20 +1,24 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
-
 import fakeredis.aioredis
 import pytest
 from fastapi import HTTPException
-
 from app.services import qr as qr_service
-
 
 async def _prepare(monkeypatch):
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(qr_service, "redis_client", client)
     monkeypatch.setattr(
-        qr_service, "get_membership",
-        AsyncMock(return_value={"status": "active"}),
+        qr_service,
+        "get_membership",
+        AsyncMock(return_value={
+            "status": "active",
+            "next_payment_at": (
+                datetime.now(UTC) + timedelta(days=30)
+            ).isoformat(),
+        }),
     )
     monkeypatch.setattr(qr_service.secrets, "token_urlsafe", lambda _: "A" * 43)
     monkeypatch.setattr(
@@ -24,7 +28,6 @@ async def _prepare(monkeypatch):
     owner = uuid4()
     result = await qr_service.generate_access_qr(owner, "test-token")
     return client, owner, result
-
 
 def test_status_changes_to_used_and_code_cannot_be_reused(monkeypatch):
     async def run():

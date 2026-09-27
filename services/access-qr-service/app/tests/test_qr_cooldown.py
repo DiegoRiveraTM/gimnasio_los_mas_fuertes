@@ -1,23 +1,33 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
-
 import fakeredis.aioredis
 import pytest
 from fastapi import HTTPException
-
 from app.services import qr as service
 
 
 async def prepare(monkeypatch):
     client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(service, "redis_client", client)
-    monkeypatch.setattr(service, "get_membership", AsyncMock(return_value={"status": "active"}))
-    monkeypatch.setattr(service, "_make_qr_data_uri", lambda _: "data:image/png;base64,dGVzdA==")
+    monkeypatch.setattr(
+        service,
+        "get_membership",
+        AsyncMock(return_value={
+            "status": "active",
+            "next_payment_at": (
+                datetime.now(UTC) + timedelta(days=30)
+            ).isoformat(),
+        }),
+    )
+    monkeypatch.setattr(
+        service, "_make_qr_data_uri",
+        lambda _: "data:image/png;base64,dGVzdA==",
+    )
     codes = iter(["A" * 43, "B" * 43, "C" * 43])
     monkeypatch.setattr(service.secrets, "token_urlsafe", lambda _: next(codes))
     return client
-
 
 def test_old_qr_is_rejected_during_cooldown_and_attempt_does_not_extend_it(monkeypatch):
     async def run():
