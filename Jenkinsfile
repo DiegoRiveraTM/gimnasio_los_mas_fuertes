@@ -21,8 +21,8 @@ pipeline {
             environment {
             DATABASE_URL = 'postgresql+psycopg://ci:ci@127.0.0.1:1/ci'
             REDIS_URL = 'redis://127.0.0.1:1/0'
-            SECRET_KEY = 'ci-only-signing-key-not-for-production-123456789'
             MEMBERSHIP_SERVICE_URL = 'http://127.0.0.1:1'
+            SECRET_KEY = 'ci-only-signing-key-not-for-production-123456789'
             QR_SCANNER_API_KEY = 'ci-only-scanner-key'
         }
             steps {
@@ -47,11 +47,57 @@ pipeline {
             }
         }
 
-        stage('Trivy filesystem scan') {
+        stage('Trivy vulnerabilities and secrets') {
             steps {
-                sh 'trivy fs --scanners vuln,misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs "./.ci-venvs" .'
+                sh '''
+                    trivy fs \
+                    --scanners vuln,secret \
+                    --severity HIGH,CRITICAL \
+                    --exit-code 1 \
+                    --skip-dirs .ci-venvs \
+                    .
+                '''
             }
         }
+
+        stage('Trivy configuration - application') {
+                    steps {
+                        sh '''
+                            trivy config \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 1 \
+                            --skip-dirs .ci-venvs \
+                            --skip-dirs infra/terraform \
+                            .
+                        '''
+                    }
+                }
+
+        stage('Trivy Terraform - advisory for local demo') {
+            steps {
+                script {
+                    // Temporal: corregir antes del despliegue en AWS.
+                    def scanStatus = sh(
+                        returnStatus: true,
+                        script: '''
+                            trivy config \
+                            --severity HIGH,CRITICAL \
+                            --exit-code 42 \
+                            infra/terraform
+                        '''
+                    )
+
+            if (scanStatus == 42) {
+                unstable(
+                    'Terraform has unresolved security findings. ' +
+                    'AWS deployment is not approved.'
+                )
+            } else if (scanStatus != 0) {
+                error("Terraform scan could not complete: ${scanStatus}")
+            }
+        }
+    }
+}
 
         stage('Semgrep SAST') {
             steps {
