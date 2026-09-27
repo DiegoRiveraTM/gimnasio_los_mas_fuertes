@@ -5,7 +5,9 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
     }
-
+    triggers {
+        pollSCM('H/2 * * * *')
+    }
         environment {
         SERVICES = 'auth-service membership-service access-qr-service'
     }
