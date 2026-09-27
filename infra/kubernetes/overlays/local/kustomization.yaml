@@ -1,30 +1,23 @@
-apiVersion: "kustomize.config.k8s.io/v1beta1"
-kind: "Kustomization"
-namespace: "gym-lmf"
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gym-lmf
 resources:
-  - "../../base"
-  - "auth-db.yaml"
-  - "membership-db.yaml"
-  - "redis.yaml"
+- ../../base
+- auth-db.yaml
+- membership-db.yaml
+- redis.yaml
 images:
-  -
-    name: "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/auth-service"
-    newName: "gym-lmf/auth-service"
-    newTag: "local"
-  -
-    name: "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/membership-service"
-    newName: "gym-lmf/membership-service"
-    newTag: "local"
-  -
-    name: "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/access-qr-service"
-    newName: "gym-lmf/access-qr-service"
-    newTag: "local"
+- name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/auth-service
+  newName: gym-lmf/auth-service
+  newTag: '13'
+- name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/membership-service
+  newName: gym-lmf/membership-service
+  newTag: '13'
+- name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/access-qr-service
+  newName: gym-lmf/access-qr-service
+  newTag: '13'
 patches:
-  -
-    path: "auth-service-patch.yaml"
-  -
-    path: "membership-service-patch.yaml"
-  -
-    path: "access-qr-service-patch.yaml"
-  -
-    path: security-hardening.yaml
+- path: auth-service-patch.yaml
+- path: membership-service-patch.yaml
+- path: access-qr-service-patch.yaml
+- path: security-hardening.yaml
