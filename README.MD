@@ -1,112 +1,130 @@
 # Gym-LMF
 
-### Gestión de membresías y acceso al gimnasio mediante QR de un solo uso
+MVP para la gestión de usuarios, consulta de membresías y control de acceso a un gimnasio mediante códigos QR temporales de un solo uso.
 
-Un MVP con frontend React y tres microservicios Python, diseñado para desplegarse en AWS y automatizarse con Jenkins y Argo CD.
+Proyecto académico desarrollado de forma individual para integrar arquitectura de microservicios, contenedores, pruebas automatizadas, análisis de seguridad y entrega continua.
 
-![React](https://img.shields.io/badge/React-Frontend-61DAFB?style=flat-square&logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-Language-3178C6?style=flat-square&logo=typescript&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=flat-square&logo=postgresql&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-QR%20State-DC382D?style=flat-square&logo=redis&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Local%20Environment-2496ED?style=flat-square&logo=docker&logoColor=white)
+## Estado del proyecto
 
-**Registro · Autenticación · Membresías · Acceso dinámico**
+El entorno local cuenta con un flujo CI/CD funcional. Un cambio enviado a `main` inicia Jenkins, ejecuta las verificaciones, construye las imágenes, las carga en Kind y actualiza los manifiestos de `deploy/local`. Argo CD detecta los cambios y sincroniza Kubernetes.
 
----
+La sincronización automática se verificó con el build 14, publicado en el commit `d489974` de `deploy/local`. El build 13 también se verificó consultando las imágenes desplegadas en Kubernetes.
 
-## Sobre el proyecto
+| Área | Estado |
+|---|---|
+| Frontend y flujo principal | Probados manualmente en local |
+| Pruebas unitarias de los tres microservicios | Ejecutadas satisfactoriamente en Jenkins |
+| Construcción de imágenes Docker | Verificada |
+| Backend en Kubernetes con Kind | Desplegado y verificado |
+| Inicio de Jenkins por cambios en GitHub | Verificado mediante Poll SCM |
+| Publicación GitOps en `deploy/local` | Verificada |
+| Sincronización automática con Argo CD | Verificada |
+| Infraestructura AWS con Terraform | Preparada; correcciones y despliegue pendientes |
+| Interfaz de recepción con cámara | Fuera del alcance implementado |
 
-Gym-LMF permite que un usuario consulte su información y membresía y genere un código QR temporal para acceder al gimnasio.
-
-El QR contiene un código aleatorio, **no el JWT del usuario**. La validación se realiza en el backend y requiere autorización del escáner de recepción.
-
-Este proyecto es un MVP académico. El flujo principal ha sido probado manualmente en el entorno local; el despliegue en AWS y la demostración del CI/CD son los siguientes objetivos.
+El pipeline puede finalizar como `UNSTABLE` por hallazgos de seguridad pendientes en Terraform. Esta política permite continuar la demostración local, pero no constituye una aprobación para desplegar en AWS.
 
 ## Funcionalidades
 
 - Registro de usuarios con validación de contraseña.
-- Inicio de sesión con JWT.
+- Inicio de sesión y autenticación mediante JWT.
 - Consulta del perfil del usuario autenticado.
-- Consulta de plan, estado, costo y próxima fecha de pago de la membresía.
-- Generación de QR para usuarios con membresía activa.
-- QR con vigencia de **60 segundos** y uso único.
-- Validación protegida mediante una clave de escáner.
-- Consulta del estado del QR con autorización de su propietario.
-- Regreso al dashboard tras una validación exitosa.
-- Bloqueo de nuevos accesos durante **180 segundos** tras una entrada válida.
-- Interfaz con modo claro y oscuro.
+- Consulta del plan, estado, costo y próxima fecha de pago de la membresía.
+- Generación de QR para usuarios con membresía activa y vigente.
+- QR con vigencia máxima de 60 segundos y uso único.
+- Validación del acceso mediante una clave de escáner autorizada.
+- Consulta del estado del QR únicamente por su propietario.
+- Actualización de la interfaz tras una validación exitosa.
+- Bloqueo de nuevos accesos durante 180 segundos después de una entrada válida.
 
-> La cámara normal de un teléfono solo lee el contenido del QR. Para registrar una entrada es necesario enviar el código a la API de validación desde un escáner autorizado. Actualmente se utiliza Swagger para esta demostración; la interfaz de recepción con cámara está pendiente.
+El QR contiene un código aleatorio, no el JWT del usuario. Leerlo con una cámara no registra una entrada: el código debe enviarse a la API de validación con la autorización del escáner.
+
+Registrar un usuario no crea automáticamente una membresía. Para la demostración se prepara una membresía en la base de datos con el identificador real del usuario. La administración de membresías, los pagos y la integración con torniquetes no forman parte del MVP.
 
 ## Arquitectura
 
-```mermaid
-flowchart LR
-    U[Usuario] --> WEB[React + Vite]
-    WEB --> AUTH[Auth service]
-    WEB --> MEMBERSHIP[Membership service]
-    WEB --> QR[Access QR service]
-    AUTH --> ADB[(Auth PostgreSQL)]
-    MEMBERSHIP --> MDB[(Membership PostgreSQL)]
-    QR --> MEMBERSHIP
-    QR --> REDIS[(Redis)]
-    SCANNER[Recepción autorizada / Swagger] --> QR
-```
-
-| Componente | Responsabilidad | Puerto local |
-|---|---|---:|
-| Frontend | Registro, login, dashboard y QR | 5173, o el que indique Vite |
-| Auth service | Usuarios, contraseñas y JWT | 8000 |
-| Membership service | Consulta de membresías | 8001 |
-| Access QR service | Generación, validación y estado del QR | 8002 |
-| Auth PostgreSQL | Persistencia de usuarios | 5433 |
-| Membership PostgreSQL | Persistencia de membresías | 5434 |
-| Redis | Códigos temporales, estados y bloqueo de acceso | 6379 |
-
-Los puertos de las bases de datos corresponden a su publicación local en Docker Compose. Dentro de los contenedores PostgreSQL utiliza el puerto 5432.
-
-## Estructura del repositorio
+El frontend utiliza React, TypeScript y Vite. El backend está dividido en tres microservicios Python con FastAPI. Autenticación y membresías tienen bases de datos independientes; Redis conserva los códigos QR, sus estados y el bloqueo temporal entre accesos.
 
 ```text
-gym-mvp/
-├── apps/
-│   ├── admin-web/              # Frontend React + TypeScript
-│   └── mobile/                 # Reservado; fuera del alcance actual
-├── services/
-│   ├── auth-service/
-│   ├── membership-service/
-│   └── access-qr-service/
-├── infra/
-│   ├── docker/                 # Compose y configuración de observabilidad
-│   ├── kubernetes/
-│   │   ├── base/
-│   │   └── overlays/dev/
-│   ├── argocd/                 # Definición de Application
-│   └── terraform/              # Infraestructura AWS
-├── docs/
-├── protos/
-├── Jenkinsfile
-└── .gitignore
+Frontend React
+    ├── Auth service ─────────── PostgreSQL de usuarios
+    ├── Membership service ───── PostgreSQL de membresías
+    └── Access QR service
+            ├── Consulta a Membership service
+            └── Redis: códigos, estados y bloqueo temporal
+
+Escáner autorizado ───────────── Access QR service
 ```
 
-## Ejecución local
+| Componente | Responsabilidad | Puerto del servicio |
+|---|---|---:|
+| Auth service | Usuarios, contraseñas y JWT | 8000 |
+| Membership service | Consulta de membresías | 8001 |
+| Access QR service | Generación, consumo y estado del QR | 8002 |
+| PostgreSQL | Persistencia de cada servicio | 5432 |
+| Redis | Datos temporales de acceso | 6379 |
+
+Docker Compose y Kind son entornos separados. Sus bases de datos no comparten usuarios ni membresías.
+
+## Tecnologías
+
+- React, TypeScript y Vite.
+- Python 3.12, FastAPI, SQLAlchemy y Psycopg.
+- PostgreSQL y Redis.
+- Pytest y Fakeredis.
+- Docker y Docker Compose.
+- Kubernetes, Kind y Kustomize.
+- Jenkins, Trivy y Semgrep.
+- Argo CD y GitOps.
+- Terraform para la infraestructura propuesta en AWS.
+- Prometheus y Grafana para observabilidad en Compose.
+
+## Estructura principal
+
+```text
+apps/admin-web/                       Frontend React
+services/
+    auth-service/                     Autenticación
+    membership-service/               Membresías
+    access-qr-service/                Acceso QR
+infra/
+    docker/                           Compose y observabilidad
+    kubernetes/
+        base/                         Manifiestos base
+        overlays/local/               Configuración para Kind
+        overlays/dev/                 Configuración destinada a AWS
+    argocd/                           Definiciones de Application
+    jenkins/
+        agent/Dockerfile              Imagen del agente Jenkins
+        publish_local_gitops.py       Publicación GitOps
+    terraform/                        Infraestructura AWS
+scripts/                              Preparación local
+Jenkinsfile                           Definición del pipeline
+```
+
+## Ejecución con Docker Compose
 
 ### Requisitos
 
-- Docker con Docker Compose.
-- Node.js y npm compatibles con la versión de Vite del proyecto.
 - Git.
-- Python compatible con cada servicio para ejecutar pruebas fuera de Docker.
-- Configuración privada del backend: conexiones a las bases de datos, Redis y claves de autenticación.
+- Docker con Docker Compose.
+- Node.js y npm compatibles con las dependencias del frontend.
+- Configuración privada de los microservicios.
 
-### 1. Preparar la configuración
+Clonar el repositorio:
 
-Configura los valores requeridos por `infra/docker/docker-compose.yml` y los archivos de configuración de cada servicio.
+```bash
+git clone https://github.com/DiegoRiveraTM/gimnasio_los_mas_fuertes.git
+cd gimnasio_los_mas_fuertes
+```
 
-No se incluyen valores secretos en este README. Revisa `app/core/config.py` de cada servicio para conocer sus variables requeridas.
+Si se requiere autenticación, utilizar credenciales autorizadas sin incluir tokens en la URL.
 
-Para el frontend, crea `apps/admin-web/.env.local`:
+### Configuración
+
+Revisar las variables requeridas en `app/core/config.py` de cada servicio y en `infra/docker/docker-compose.yml`. Las conexiones con Psycopg 3 utilizan el esquema `postgresql+psycopg://`. Los servicios que validan los mismos JWT deben utilizar una configuración de firma compatible.
+
+Crear `apps/admin-web/.env.local`:
 
 ```dotenv
 VITE_AUTH_API_URL=http://localhost:8000
@@ -114,30 +132,26 @@ VITE_MEMBERSHIP_API_URL=http://localhost:8001
 VITE_QR_API_URL=http://localhost:8002
 ```
 
-Estas variables son URLs públicas de las APIs, **no secretos**. No pongas claves privadas, claves JWT ni la clave del escáner en variables `VITE_*`.
+Estas URLs son públicas. No incluir contraseñas, tokens, claves de firma ni la clave del escáner en variables `VITE_*`. Configurar CORS para permitir el origen exacto del frontend, incluido su puerto.
 
-En el CORS de cada backend permite el origen exacto del frontend, incluido su puerto. Si Vite inicia en 5174, debe permitirse ese origen en lugar de asumir 5173.
-
-### 2. Levantar el backend
+### Iniciar los servicios
 
 Desde la raíz del repositorio:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml up -d --build auth-service membership-service qr-access-service
+docker compose -f infra/docker/docker-compose.yml ps
 ```
 
-Compose levantará las dependencias declaradas para esos servicios.
+El servicio QR se llama `qr-access-service` en Compose; su carpeta es `services/access-qr-service`.
 
-> El nombre de QR en Compose es `qr-access-service`; su carpeta se llama `access-qr-service`.
-
-Consultar el estado y los logs:
+Consultar los registros:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml ps
 docker compose -f infra/docker/docker-compose.yml logs -f auth-service membership-service qr-access-service
 ```
 
-### 3. Iniciar el frontend
+Iniciar el frontend en otra terminal:
 
 ```bash
 cd apps/admin-web
@@ -145,165 +159,233 @@ npm ci
 npm run dev
 ```
 
-Abre la URL que indique Vite en la terminal. Si modificas `.env.local`, reinicia el servidor de desarrollo.
+Abrir la dirección indicada por Vite. Reiniciar el servidor de desarrollo después de modificar `.env.local`.
 
-### 4. Preparar una membresía de demostración
+## Kubernetes local con Kind
 
-Registrar un usuario **no crea automáticamente una membresía**.
+El entorno verificado utiliza:
 
-Para la demostración local se asigna una membresía en la base de datos de membership usando el ID real obtenido en `GET /auth/me`. No uses un ID tomado de otro usuario.
+- Clúster: `gym-lmf`.
+- Contexto: `kind-gym-lmf`.
+- Namespace de la aplicación: `gym-lmf`.
+- Namespace de Argo CD: `argocd`.
+- Application: `gym-lmf-local`.
+- Ruta de manifiestos: `infra/kubernetes/overlays/local`.
+- Rama observada por Argo CD: `deploy/local`.
 
-La administración de membresías mediante una interfaz no forma parte del alcance actual.
+Se requiere una preparación inicial: creación del clúster, secretos locales, almacenamiento, instalación de Jenkins y Argo CD y configuración de credenciales. Clonar el repositorio no reproduce por sí solo estos componentes.
+
+Los secretos se preparan fuera de Git. El script `scripts/create-local-secrets.py` conserva los secretos existentes y se detiene ante un conjunto parcialmente creado. No regenerar contraseñas mientras PostgreSQL mantiene datos en sus volúmenes persistentes.
+
+### Verificación
+
+Consultar los pods:
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf get pods
+```
+
+Consultar las imágenes desplegadas:
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf get deployments \
+  auth-service membership-service access-qr-service \
+  -o 'custom-columns=NAME:.metadata.name,IMAGE:.spec.template.spec.containers[*].image'
+```
+
+Comprobar un rollout:
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf \
+  rollout status deployment/auth-service --timeout=300s
+```
+
+Repetir para `membership-service` y `access-qr-service` cuando corresponda.
+
+### Acceso a las APIs
+
+Ejecutar cada comando en una terminal independiente:
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf port-forward service/auth-service 18000:8000
+```
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf port-forward service/membership-service 18001:8001
+```
+
+```bash
+kubectl --context kind-gym-lmf -n gym-lmf port-forward service/access-qr-service 18002:8002
+```
+
+Documentación interactiva:
+
+- Auth: [http://localhost:18000/docs](http://localhost:18000/docs).
+- Membership: [http://localhost:18001/docs](http://localhost:18001/docs).
+- QR: [http://localhost:18002/docs](http://localhost:18002/docs).
+
+Para conectar el frontend a Kind, utilizar los puertos `18000`, `18001` y `18002` en las variables `VITE_*_API_URL` y reiniciar Vite.
 
 ## API principal
 
 | Servicio | Método | Ruta | Autorización |
 |---|---|---|---|
-| Auth | POST | `/auth/register` | No requiere JWT |
-| Auth | POST | `/auth/login` | No requiere JWT |
+| Auth | POST | `/auth/register` | Sin JWT |
+| Auth | POST | `/auth/login` | Sin JWT |
 | Auth | GET | `/auth/me` | JWT |
 | Membership | GET | `/memberships/me` | JWT |
-| QR | POST | `/qr/me` | JWT y membresía activa |
+| QR | POST | `/qr/me` | JWT y membresía vigente |
 | QR | GET | `/qr/status/{qr_id}` | JWT del propietario |
 | QR | POST | `/qr/validate` | `X-Scanner-Api-Key` |
 
-Documentación interactiva local:
+Consultar los esquemas de entrada y salida en la documentación de cada servicio. La validación de recepción se demuestra mediante Swagger; no se ha implementado una interfaz dedicada de cámara.
 
-- Auth: [localhost:8000/docs](http://localhost:8000/docs)
-- Membership: [localhost:8001/docs](http://localhost:8001/docs)
-- QR: [localhost:8002/docs](http://localhost:8002/docs)
+## Reglas de acceso QR
 
-## Flujo de acceso
+1. El usuario se autentica y solicita un QR.
+2. El servicio consulta la membresía y valida su estado y vencimiento.
+3. Se genera un código aleatorio y se almacena temporalmente en Redis.
+4. El escáner autorizado envía el código a la API.
+5. Un acceso válido consume el código e inicia el bloqueo de 180 segundos.
+6. El frontend consulta el estado del QR y refleja el resultado.
 
-```mermaid
-sequenceDiagram
-    participant Usuario
-    participant Web as Frontend
-    participant QR as QR service
-    participant M as Membership service
-    participant R as Redis
-    participant Recepcion as Recepción autorizada
+Un QR usado no puede reutilizarse. Un QR expirado no registra una entrada. Un intento rechazado durante el bloqueo no extiende su duración. La vigencia del QR no debe superar la vigencia restante de la membresía.
 
-    Usuario->>Web: Generar QR
-    Web->>QR: POST /qr/me + JWT
-    QR->>M: Consultar membresía
-    M-->>QR: Membresía activa
-    QR->>R: Guardar acceso por 60 s y estado temporal
-    QR-->>Web: Imagen PNG + identificador + expiración
-    loop Mientras está pendiente
-        Web->>QR: Consultar estado con JWT
-        QR-->>Web: pending / used / expired
-    end
-    Recepcion->>QR: Validar código + clave del escáner
-    QR->>R: Consumir código, marcar usado y bloquear usuario 180 s
-    QR-->>Recepcion: Resultado de validación
-    Web->>QR: Consultar estado
-    QR-->>Web: used
-    Web-->>Usuario: Volver al dashboard
+La membresía se valida al generar el QR. El MVP no implementa revocación inmediata de un código ya emitido si la membresía cambia posteriormente.
+
+## Integración y entrega continua
+
+```text
+Push a main
+    → Jenkins detecta el cambio
+    → Pruebas unitarias
+    → Trivy y Semgrep
+    → Construcción de imágenes Docker
+    → Carga de imágenes en Kind
+    → Publicación de manifiestos en deploy/local
+    → Argo CD detecta la revisión
+    → Sincronización de Kubernetes
 ```
 
-- Un QR usado no puede reutilizarse.
-- Un QR expirado no registra una entrada.
-- El bloqueo de 3 minutos comienza tras un acceso exitoso.
-- Un intento rechazado no reinicia el bloqueo.
-- La retención del estado del QR no prolonga la validez del código.
-- La decisión final de acceso siempre pertenece al backend.
+### Jenkins
+
+El job `gym-lmf-ci` utiliza el `Jenkinsfile` del repositorio y un agente con la etiqueta `gym-ci`. El agente incluye Java para comunicarse con Jenkins, Python, Git, el cliente Docker, Trivy y Semgrep. Java no es una dependencia de los microservicios.
+
+El pipeline realiza:
+
+1. Checkout de `main` en un workspace limpio.
+2. Creación de un entorno virtual independiente por microservicio.
+3. Ejecución de pruebas con Pytest.
+4. Escaneo de vulnerabilidades y secretos con Trivy.
+5. Renderizado del overlay local y análisis de su configuración.
+6. Análisis informativo de Terraform para la demostración local.
+7. Análisis estático con Semgrep.
+8. Construcción de las tres imágenes con etiquetas por número de build.
+9. Carga de imágenes en el nodo del clúster `gym-lmf`.
+10. Publicación de los manifiestos actualizados en `deploy/local`.
+
+Ejemplo de etiquetas:
+
+```text
+gym-lmf/auth-service:14
+gym-lmf/membership-service:14
+gym-lmf/access-qr-service:14
+```
+
+Jenkins consulta cambios mediante `Poll SCM`, con la programación `H/2 * * * *`. Un commit local no dispara el pipeline: debe enviarse a la rama remota observada. La detección y la ejecución no son instantáneas.
+
+Las variables ficticias del stage de pruebas son exclusivas de CI y no contienen credenciales de producción. Las fixtures reemplazan las dependencias externas utilizadas en los tests correspondientes.
+
+### Publicación GitOps
+
+`infra/jenkins/publish_local_gitops.py` copia los manifiestos versionados de CI a un clon temporal de `deploy/local`, actualiza las etiquetas y valida el renderizado antes de publicar. El commit registra el build y el commit de origen. La publicación no utiliza force push.
+
+Jenkins observa `main` y Argo CD observa `deploy/local`. Esta separación evita que los commits de despliegue disparen continuamente el mismo pipeline.
+
+Las imágenes se cargan directamente en el único nodo de Kind. El flujo local no publica imágenes en ECR ni en otro registro remoto.
+
+### Argo CD
+
+`gym-lmf-local` observa `deploy/local` y aplica el overlay local en el namespace `gym-lmf`.
+
+La sincronización automática está habilitada. La eliminación automática de recursos (`prune`) y la autocorrección de cambios manuales (`selfHeal`) permanecen deshabilitadas en esta configuración.
+
+Argo CD aplica los manifiestos, pero no construye ni transporta imágenes: Jenkins las carga previamente en Kind. La detección utiliza reconciliación periódica, por lo que un push no implica un despliegue inmediato.
+
+### Interpretación de resultados
+
+- `FAILURE`: falló una operación o un stage bloqueante.
+- `UNSTABLE`: existen hallazgos pendientes de Terraform bajo la política temporal del entorno local.
+- `Synced`: el estado observado por Argo coincide con los manifiestos de la revisión evaluada.
+- `Healthy`: los recursos cumplen las comprobaciones de salud de Argo; no sustituye las pruebas funcionales.
+
+Los análisis de vulnerabilidades, secretos, configuración de la aplicación y Semgrep siguen siendo bloqueantes según los comandos del pipeline. El análisis de configuración evalúa el overlay local renderizado, no certifica el overlay de AWS.
 
 ## Pruebas y verificaciones
 
-Cada microservicio utiliza su propio entorno virtual. Cambiar de carpeta no cambia el entorno activo.
+El stage de pruebas del `Jenkinsfile` ejecuta las suites de los tres microservicios. Los escenarios incluyen autenticación, membresías, consumo único del QR, expiración, autorización del propietario, bloqueo temporal y validaciones concurrentes.
 
-Ejemplo para QR:
+Para ejecutar tests fuera de Jenkins, preparar un entorno virtual por servicio, instalar las dependencias de prueba y proporcionar las variables de configuración antes de importar la aplicación. Las pruebas correspondientes utilizan SQLite y Fakeredis para sustituir dependencias reales.
 
-```bash
-cd services/access-qr-service
-source .venv/bin/activate
-python -m pytest -q
-```
-
-Repite la ejecución en auth y membership con sus respectivos entornos y dependencias de prueba. Entre las dependencias utilizadas están `pytest` y `fakeredis`.
-
-Verificar el frontend:
+Validar el frontend:
 
 ```bash
 cd apps/admin-web
 npm run build
 ```
 
-Renderizar los manifiestos de Kubernetes sin desplegarlos:
+Validar el renderizado local desde la raíz, sin desplegar:
 
 ```bash
-kubectl kustomize infra/kubernetes/overlays/dev
+kubectl kustomize infra/kubernetes/overlays/local > /dev/null
 ```
 
-### Pruebas manuales realizadas
+No se declara un porcentaje de cobertura. Superar pruebas y escáneres no equivale a una auditoría completa de seguridad.
 
-- Registro y login desde el frontend.
-- Consulta de perfil y membresía.
-- Generación y visualización del QR.
-- Rechazo de validación sin clave del escáner.
-- Aceptación de un QR válido y rechazo al reutilizarlo.
-- Rechazo de un QR nuevo tras su expiración.
-- Redirección al dashboard tras la validación.
+## Seguridad
 
-La ejecución completa de las pruebas automatizadas después de los últimos cambios, así como la verificación definitiva del bloqueo de 180 segundos, debe realizarse antes de la entrega. No se publican cifras de cobertura ni se afirma una ejecución exitosa del pipeline.
+- Credenciales de GitHub almacenadas en Jenkins, no en el repositorio.
+- Credencial de lectura para checkout y credencial con escritura para GitOps.
+- Secretos de Kubernetes preparados fuera de los manifiestos versionados.
+- Microservicios ejecutados con usuarios no privilegiados.
+- Endurecimiento del overlay local mediante contextos de seguridad, eliminación de capacidades, restricción de escalamiento de privilegios y sistemas de archivos raíz de solo lectura, con volúmenes para las rutas que requieren escritura.
+- Separación de las bases de datos de autenticación y membresías.
+- Autorización específica para validar códigos desde el escáner.
 
-## AWS y CI/CD
+No subir archivos `.env`, tokens, contraseñas, claves privadas, estados ni planes de Terraform. Rotar cualquier secreto expuesto en capturas, logs o historial de Git.
 
-### Estado actual
+Los Secrets de Kubernetes emplean base64, lo cual no constituye cifrado por sí mismo. Las variables `VITE_*` son visibles para el cliente y no deben contener secretos.
 
-| Área | Estado |
-|---|---|
-| Flujo principal frontend + backend | Probado manualmente en local |
-| Pruebas automatizadas | Añadidas; ejecución final pendiente |
-| Docker | Imágenes y ejecución local verificadas |
-| Kubernetes / Kustomize | Manifiestos preparados; despliegue pendiente |
-| Terraform AWS | Configuración preparada; revisión y aplicación pendientes |
-| Jenkins | Jenkinsfile preparado; instalación y ejecución pendientes |
-| Argo CD | Application preparada; sincronización real pendiente |
-| Escáner de recepción con cámara | Pendiente; validación demostrada en Swagger |
+El agente de Jenkins accede al socket Docker del host. Es un acceso de alto privilegio y debe reservarse para código y jobs de confianza.
 
-### Flujo de entrega objetivo
+## Persistencia y limitaciones
 
-```mermaid
-flowchart LR
-    PUSH[Push a GitHub] --> J[Jenkins]
-    J --> TEST[Pruebas y análisis]
-    TEST --> BUILD[Construir imágenes]
-    BUILD --> ECR[Publicar en ECR]
-    ECR --> GITOPS[Actualizar versiones en GitOps]
-    GITOPS --> ARGO[Argo CD]
-    ARGO --> EKS[Desplegar en EKS]
-```
+- PostgreSQL utiliza volúmenes persistentes en Kind. Eliminar el clúster puede provocar la pérdida de sus datos locales.
+- Redis es temporal en el overlay local; reiniciar su pod elimina códigos pendientes y bloqueos.
+- Los init containers crean las tablas para bases nuevas de la demostración; no reemplazan un proceso de migraciones.
+- La implementación utiliza Redis sin modo clúster y requiere adaptación antes de usar Redis Cluster.
+- El frontend se ejecuta por separado con Vite; no forma parte del despliegue backend verificado en Kind.
+- Prometheus y Grafana se utilizan en Compose. Esta configuración no implica supervisión automática del entorno Kind.
+- El MVP no incluye alta disponibilidad, recuperación ante desastres ni validación de capacidad para producción.
 
-El Jenkinsfile preparado contempla pruebas Python por microservicio, análisis con Trivy y Semgrep y construcción de imágenes. La publicación en ECR y la actualización GitOps deben completarse y verificarse.
+## Infraestructura AWS
 
-El frontend se plantea publicar mediante S3 y CloudFront. Los manifiestos del backend deben sustituir referencias como `ACCOUNT_ID` e `IMAGE_TAG` por imágenes reales antes del despliegue.
+Terraform contiene la infraestructura propuesta para AWS, con componentes de red, EKS, bases de datos, caché, registros de imágenes y distribución del frontend mediante S3 y CloudFront.
 
-> Un commit local no dispara Jenkins. El flujo requiere un push y una integración configurada. Argo CD sincroniza los manifiestos; no ejecuta los stages de Jenkins.
+El despliegue cloud no está completado ni validado de extremo a extremo. Los pendientes incluyen:
 
-## Seguridad y limitaciones
+- Resolver los hallazgos del endpoint público de EKS y las reglas de salida de sus grupos de seguridad.
+- Definir el acceso administrativo sin recurrir a acceso abierto.
+- Revisar costos, permisos y configuración antes de aplicar Terraform.
+- Publicar imágenes en un registro accesible para los nodos de AWS.
+- Adaptar y verificar los manifiestos del entorno cloud.
+- Definir migraciones, gestión de secretos, HTTPS y acceso público a las APIs.
+- Desplegar y validar el frontend y backend en AWS.
 
-- No subir `.env`, claves privadas, credenciales AWS, claves del escáner ni estados o planes de Terraform.
-- Rotar cualquier secreto expuesto en capturas, logs o historial de Git.
-- No almacenar contraseñas ni JWT en logs.
-- El JWT del frontend se guarda actualmente en `sessionStorage`; “Recordarme” conserva solo el correo.
-- La clave del escáner permanece del lado del backend y de la recepción autorizada.
-- Antes de publicar, revisar HTTPS, CORS y exposición de puertos.
-- La implementación del bloqueo entre QR usa transacciones en Redis **sin modo clúster**. Debe adaptarse antes de usar Redis Cluster.
-- No hay integración con torniquetes, pagos ni un escáner físico.
-- Las validaciones actuales no equivalen a una auditoría de seguridad ni a preparación para producción.
+La infraestructura debe revisarse y corregirse antes de su aplicación. La entrega local no depende de crear recursos cloud.
 
-## Objetivo de la entrega
+## Autor
 
-Demostrar una aplicación accesible en AWS y un cambio visible desplegado mediante CI/CD:
+Diego Rivera — Ingeniería en Desarrollo de Software.
 
-1. Abrir la aplicación pública y ejecutar el flujo principal.
-2. Realizar un cambio y enviarlo a GitHub.
-3. Mostrar Jenkins ejecutando las verificaciones y publicando las imágenes.
-4. Mostrar Argo CD desplegando la nueva versión.
-
----
-
-**Gym-LMF · MVP académico**
-
+Proyecto académico orientado a aplicar arquitectura de microservicios y prácticas de DevOps mediante un MVP funcional y un flujo automatizado de entrega local.
