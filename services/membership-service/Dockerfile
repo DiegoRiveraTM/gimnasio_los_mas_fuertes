@@ -8,8 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
-USER appuser
+RUN groupadd --gid 10001 appgroup \
+    && useradd --uid 10001 --gid appgroup --no-create-home appuser
+USER 10001:10001
 
 EXPOSE 8001
 

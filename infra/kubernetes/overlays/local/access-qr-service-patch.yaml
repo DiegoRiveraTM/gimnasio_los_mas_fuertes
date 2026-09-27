@@ -1,0 +1,36 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "access-qr-service"
+  namespace: gym-lmf
+spec:
+  template:
+    spec:
+      containers:
+        -
+          name: "access-qr-service"
+          imagePullPolicy: "IfNotPresent"
+          envFrom:
+            -
+              secretRef:
+                name: "qr-local-config"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: "/health"
+              port: "http"
+            periodSeconds: 5
+            failureThreshold: 30

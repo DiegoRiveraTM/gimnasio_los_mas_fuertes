@@ -12,6 +12,7 @@ from redis.exceptions import RedisError, WatchError
 from app.core.redis_client import redis_client
 from app.schemas.qr import QRCodeResponse, QRStatusResponse, QRValidationResponse
 from app.services.membership_client import get_membership
+from app.services.membership_validity import parse_membership_expiration
 
 QR_TTL_SECONDS = 60
 ACCESS_COOLDOWN_SECONDS = 180
@@ -42,6 +43,13 @@ async def generate_access_qr(user_id: UUID, access_token: str) -> QRCodeResponse
         raise HTTPException(status_code=404, detail="Membership not found")
     if membership.get("status") != "active":
         raise HTTPException(status_code=403, detail="An active membership is required")
+    try:
+        membership_expires_at = parse_membership_expiration(membership.get("next_payment_at"))
+    except ValueError as exc:
+        # No concede acceso cuando falta la fecha o viene sin zona horaria.
+        raise HTTPException(status_code=502, detail="Membership expiration data is invalid") from exc
+    if membership_expires_at <= datetime.now(UTC):
+        raise HTTPException(status_code=403, detail="Membership has expired")
 
     try:
         remaining_ms = await redis_client.pttl(_cooldown_key(str(user_id)))
@@ -64,9 +72,15 @@ async def generate_access_qr(user_id: UUID, access_token: str) -> QRCodeResponse
 
     try:
         server_seconds, microseconds = await redis_client.time()
-        expires_timestamp = server_seconds + microseconds / 1_000_000 + QR_TTL_SECONDS
+        server_timestamp = server_seconds + microseconds / 1_000_000
+        # Redis es la autoridad del TTL. Nunca mantener el QR más allá de la membresía.
+        remaining_membership_seconds = int(membership_expires_at.timestamp() - server_timestamp)
+        qr_ttl = min(QR_TTL_SECONDS, remaining_membership_seconds)
+        if qr_ttl <= 0:
+            raise HTTPException(status_code=403, detail="Membership has expired")
+        expires_timestamp = server_timestamp + qr_ttl
         async with redis_client.pipeline(transaction=True) as pipe:
-            pipe.set(access_key, str(user_id), ex=QR_TTL_SECONDS, nx=True)
+            pipe.set(access_key, str(user_id), ex=qr_ttl, nx=True)
             pipe.hset(status_key, mapping={
                 "user_id": str(user_id),
                 "state": "pending",
@@ -83,7 +97,7 @@ async def generate_access_qr(user_id: UUID, access_token: str) -> QRCodeResponse
         qr_id=qr_id,
         qr_code=image_uri,
         expires_at=datetime.fromtimestamp(expires_timestamp, UTC),
-        expires_in_seconds=QR_TTL_SECONDS,
+        expires_in_seconds=qr_ttl,
     )
 
 

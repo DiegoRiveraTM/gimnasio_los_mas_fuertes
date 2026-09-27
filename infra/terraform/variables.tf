@@ -1,12 +1,12 @@
 variable "public_key_path" {
-    description = "Public Key Content"
+  description = "Public Key Content"
 }
 
 variable "db_username" {
-    sensitive = true
+  sensitive = true
 }
 variable "db_password" {
-    sensitive = true
+  sensitive = true
 }
 
 #modificar esto en el eks

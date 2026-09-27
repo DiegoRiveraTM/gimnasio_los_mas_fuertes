@@ -1,5 +1,5 @@
 resource "aws_elasticache_subnet_group" "gym_lmf" {
-  name       = "gym-lmf-redis-subnet"
+  name = "gym-lmf-redis-subnet"
   subnet_ids = [
     aws_subnet.gym_lmf_private_subnet.id,
     aws_subnet.gym_lmf_private_subnet_2.id,

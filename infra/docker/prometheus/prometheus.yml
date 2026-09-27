@@ -2,11 +2,17 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets: ["prometheus:9090"]
-
   - job_name: auth-service
     metrics_path: /metrics
     static_configs:
-      - targets: ["auth-service:8000"]
+      - targets: ['auth-service:8000']
+
+  - job_name: membership-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['membership-service:8001']
+
+  - job_name: qr-access-service
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['qr-access-service:8002']

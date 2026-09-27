@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [membershipError, setMembershipError] = useState('')
   const [loading, setLoading] = useState(true)
   const [retry, setRetry] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
   const [isDark, setIsDark] = useState(() => document.documentElement.dataset.theme === 'dark')
 
   useEffect(() => {
@@ -59,10 +60,29 @@ export default function DashboardPage() {
     return () => controller.abort()
   }, [navigate, retry])
 
+  // Actualiza la vigencia incluso si el usuario deja abierto el dashboard.
+  useEffect(() => {
+    const update = () => setNow(Date.now())
+    update()
+    const timer = window.setInterval(update, 1000)
+    window.addEventListener('focus', update)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', update)
+    }
+  }, [])
+
   const cardStyle = { background: 'var(--bg-card)', borderColor: 'var(--border-color)' }
-  const active = Boolean(user && membership?.status === 'active' && !loading)
+  const expiresAt = membership?.next_payment_at
+    ? Date.parse(membership.next_payment_at) : Number.NaN
+  const validExpiry = Number.isFinite(expiresAt)
+  const effectiveStatus = membership?.status === 'active'
+    ? !validExpiry ? 'unknown' : expiresAt <= now ? 'expired' : 'active'
+    : membership?.status ?? 'unknown'
+  // El backend es la autoridad; esta comprobación solo ajusta la interfaz.
+  const active = Boolean(user && effectiveStatus === 'active' && !loading)
   const planLabels: Record<string, string> = { bronze: 'Bronce', silver: 'Plata', gold: 'Oro' }
-  const statusLabels: Record<string, string> = { active: 'Activa', inactive: 'Inactiva', expired: 'Vencida', suspended: 'Suspendida' }
+  const statusLabels: Record<string, string> = { active: 'Activa', inactive: 'Inactiva', expired: 'Vencida', suspended: 'Suspendida', unknown: 'No disponible' }
 
   return (
     <div className="min-h-screen transition-colors" style={{ background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
@@ -111,9 +131,9 @@ export default function DashboardPage() {
                 <div className="mb-6 flex items-center justify-between gap-3">
                   <p className="text-2xl font-bold">{planLabels[membership.membership_type] || membership.membership_type}</p>
                   <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{
-                    borderColor: membership.status === 'active' ? 'var(--accent)' : 'var(--border-color)',
-                    color: membership.status === 'active' ? 'var(--accent-hover)' : 'var(--text-secondary)',
-                  }}>{statusLabels[membership.status] || membership.status}</span>
+                    borderColor: effectiveStatus === 'active' ? 'var(--accent)' : 'var(--border-color)',
+                    color: effectiveStatus === 'active' ? 'var(--accent-hover)' : 'var(--text-secondary)',
+                  }}>{statusLabels[effectiveStatus] || effectiveStatus}</span>
                 </div>
                 <dl className="space-y-4 text-sm">
                   <div className="flex justify-between gap-4"><dt style={{ color: 'var(--text-secondary)' }}>Costo mensual</dt><dd className="font-semibold">{Number.isFinite(Number(membership.monthly_cost)) ? Number(membership.monthly_cost).toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : membership.monthly_cost}</dd></div>
@@ -133,7 +153,7 @@ export default function DashboardPage() {
           <button type="button" disabled={!active} onClick={() => navigate('/qr')}
             className="w-full rounded-lg px-6 py-3 text-sm font-semibold transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             style={{ background: 'var(--accent)', color: 'var(--accent-text)' }}>Mostrar mi QR</button>
-          {!loading && !active && <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>Necesitas una sesión válida y una membresía activa para continuar.</p>}
+          {!loading && !active && <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{effectiveStatus === 'expired' ? 'Tu membresía está vencida. Contacta a recepción para renovarla.' : 'Necesitas una sesión válida y una membresía vigente para continuar.'}</p>}
         </section>
       </main>
     </div>

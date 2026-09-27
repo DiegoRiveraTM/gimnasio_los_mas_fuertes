@@ -1,0 +1,57 @@
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "membership-service"
+  namespace: gym-lmf
+spec:
+  template:
+    spec:
+      containers:
+        -
+          name: "membership-service"
+          imagePullPolicy: "IfNotPresent"
+          envFrom:
+            -
+              secretRef:
+                name: "membership-local-config"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: "/health"
+              port: "http"
+            periodSeconds: 5
+            failureThreshold: 30
+      initContainers:
+        -
+          name: "initialize-local-schema"
+          image: "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/membership-service:IMAGE_TAG"
+          imagePullPolicy: "IfNotPresent"
+          envFrom:
+            -
+              secretRef:
+                name: "membership-local-config"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          command:
+            - "python"
+            - "-c"
+            - "import importlib\nimport time\nfrom sqlalchemy.exc import OperationalError\nfrom app.db.db import Base, engine\nimportlib.import_module(\"app.models.membership\")\nif not Base.metadata.tables:\n    raise RuntimeError(\"No SQLAlchemy models registered\")\nfor attempt in range(60):\n    try:\n        Base.metadata.create_all(bind=engine)\n        print(\"Local database tables initialized\")\n        break\n    except OperationalError:\n        if attempt == 59:\n            raise RuntimeError(\"Database unavailable after local initialization retries\") from None\n        print(\"Waiting for local database...\")\n        time.sleep(3)\n"

@@ -22,3 +22,12 @@ dist/
 /infra/terraform/.terraform/
 *.tfstate
 *.tfstate.*
+
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+
+/scripts
