@@ -60,18 +60,38 @@ pipeline {
             }
         }
 
-        stage('Trivy configuration - application') {
-                    steps {
-                        sh '''
-                            trivy config \
-                            --severity HIGH,CRITICAL \
-                            --exit-code 1 \
-                            --skip-dirs .ci-venvs \
-                            --skip-dirs infra/terraform \
-                            .
-                        '''
-                    }
-                }
+                stage('Trivy configuration - application') {
+            steps {
+                sh '''
+                    set -eu
+
+                    mkdir -p .ci-tools .ci-rendered
+
+                    curl --fail --location --retry 3 \
+                      https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl \
+                      -o .ci-tools/kubectl
+
+                    curl --fail --location --retry 3 \
+                      https://dl.k8s.io/release/v1.37.0/bin/linux/amd64/kubectl.sha256 \
+                      -o .ci-tools/kubectl.sha256
+
+                    echo "$(cat .ci-tools/kubectl.sha256)  .ci-tools/kubectl" | sha256sum --check -
+                    chmod +x .ci-tools/kubectl
+
+                    .ci-tools/kubectl kustomize infra/kubernetes/overlays/local \
+                      > .ci-rendered/local.yaml
+
+                    trivy config \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --skip-dirs .ci-venvs \
+                      --skip-dirs .ci-tools \
+                      --skip-dirs infra/terraform \
+                      --skip-dirs infra/kubernetes \
+                      .
+                '''
+            }
+        }
 
         stage('Trivy Terraform - advisory for local demo') {
             steps {
