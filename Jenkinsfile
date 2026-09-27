@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'gym-ci' }
 
     options {
         skipDefaultCheckout(true)
