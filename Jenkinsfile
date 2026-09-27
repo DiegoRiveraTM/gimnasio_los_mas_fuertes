@@ -5,6 +5,7 @@ pipeline {
         skipDefaultCheckout(true)
         disableConcurrentBuilds()
     }
+    // Esta linea de abajo automatiza el pipeline, Jenkins checará github cada 2 minutos
     triggers {
         pollSCM('H/2 * * * *')
     }
