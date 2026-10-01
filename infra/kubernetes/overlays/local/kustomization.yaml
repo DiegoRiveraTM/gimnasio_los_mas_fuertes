@@ -9,13 +9,13 @@ resources:
 images:
 - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/auth-service
   newName: gym-lmf/auth-service
-  newTag: '14'
+  newTag: '15'
 - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/membership-service
   newName: gym-lmf/membership-service
-  newTag: '14'
+  newTag: '15'
 - name: ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/access-qr-service
   newName: gym-lmf/access-qr-service
-  newTag: '14'
+  newTag: '15'
 patches:
 - path: auth-service-patch.yaml
 - path: membership-service-patch.yaml
